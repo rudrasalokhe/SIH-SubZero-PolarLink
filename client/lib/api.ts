@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CargoItem, PersonnelItem, SOSAlertItem, DashboardStats } from './types';
+import { CargoItem, PersonnelItem, SOSAlertItem, DashboardStats, AuthUser, HQOverviewData } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -10,6 +10,55 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Request interceptor: Attach JWT token if available
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('polarlink_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// Response interceptor: Redirect to /login on 401 Unauthorized
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      const isLoginPath = window.location.pathname === '/login';
+      if (!isLoginPath) {
+        localStorage.removeItem('polarlink_token');
+        localStorage.removeItem('polarlink_user');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth Endpoints
+export async function apiLogin(credentials: { email: string; password: string }): Promise<{ token: string; user: AuthUser }> {
+  const res = await apiClient.post('/auth/login', credentials);
+  return res.data.data;
+}
+
+export async function apiRegister(userData: {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+  stationId: string;
+}): Promise<{ token: string; user: AuthUser }> {
+  const res = await apiClient.post('/auth/register', userData);
+  return res.data.data;
+}
+
+export async function apiGetMe(): Promise<AuthUser> {
+  const res = await apiClient.get('/auth/me');
+  return res.data.data;
+}
 
 // Cargo Endpoints
 export async function apiGetCargo(category?: string, status?: string): Promise<CargoItem[]> {
@@ -24,6 +73,11 @@ export async function apiCreateCargo(cargo: Partial<CargoItem>): Promise<CargoIt
 
 export async function apiUpdateCargo(itemId: string, cargo: Partial<CargoItem>): Promise<CargoItem> {
   const res = await apiClient.put(`/cargo/${itemId}`, cargo);
+  return res.data.data;
+}
+
+export async function apiConfirmCargo(itemId: string): Promise<CargoItem> {
+  const res = await apiClient.put(`/cargo/${itemId}/confirm`);
   return res.data.data;
 }
 
@@ -55,7 +109,7 @@ export async function apiGetAvailableMedics(stationId?: string): Promise<Personn
 // SOS Endpoints
 export async function apiRaiseSOS(alert: {
   alertId?: string;
-  raisedBy: string;
+  raisedBy?: string;
   stationId?: string;
   location?: { lat: number; lng: number };
   severity?: string;
@@ -100,6 +154,11 @@ export async function apiAcknowledgeSync(items: Array<{ collection: string; docu
 // Health & Dashboard
 export async function apiGetDashboardStats(): Promise<DashboardStats> {
   const res = await apiClient.get('/dashboard/stats');
+  return res.data.data;
+}
+
+export async function apiGetHQOverview(): Promise<HQOverviewData> {
+  const res = await apiClient.get('/dashboard/hq-overview');
   return res.data.data;
 }
 

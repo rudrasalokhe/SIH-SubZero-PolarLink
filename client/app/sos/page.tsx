@@ -9,6 +9,7 @@ import {
   getAllCargoLocal,
 } from '@/lib/db';
 import { triggerPrioritySOSSync, syncAll } from '@/lib/syncManager';
+import { apiAcknowledgeAlert, apiResolveAlert } from '@/lib/api';
 import { SOSAlertItem, PersonnelItem, CargoItem, AlertSeverity } from '@/lib/types';
 import {
   AlertOctagon,
@@ -26,8 +27,10 @@ import {
   RefreshCw,
   Flame,
   WifiOff,
+  Shield,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function SOSPage() {
   const [alerts, setAlerts] = useState<SOSAlertItem[]>([]);
@@ -38,15 +41,17 @@ export default function SOSPage() {
   const [submitting, setSubmitting] = useState(false);
   const [geoStatus, setGeoStatus] = useState<string>('Detecting GPS...');
 
-  const { isEffectivelyOnline, addSyncLog } = useAppStore();
+  const { isEffectivelyOnline, addSyncLog, user } = useAppStore();
   const online = isEffectivelyOnline();
 
   // Form state
-  const [raisedBy, setRaisedBy] = useState('');
+  const [raisedBy, setRaisedBy] = useState(user?.personnelId || '');
   const [severity, setSeverity] = useState<AlertSeverity>('critical');
-  const [stationId, setStationId] = useState('station-alpha');
+  const [stationId, setStationId] = useState(user?.stationId || 'station-alpha');
   const [lat, setLat] = useState(-77.846);
   const [lng, setLng] = useState(166.668);
+
+  const canTriage = user?.role === 'medic' || user?.role === 'commander';
 
   const loadData = async () => {
     try {
@@ -136,15 +141,17 @@ export default function SOSPage() {
 
   const handleAcknowledge = async (alertId: string) => {
     await updateSOSStatusLocal(alertId, 'acknowledged');
-    addSyncLog(`SOS Alert ${alertId} acknowledged`, 'info', 'SOSAlert', alertId);
+    addSyncLog(`SOS Alert ${alertId} acknowledged by ${user?.name || 'Medic'}`, 'info', 'SOSAlert', alertId);
     await loadData();
+    apiAcknowledgeAlert(alertId).catch((e) => console.warn('Background ACK sync:', e));
     syncAll().then(loadData);
   };
 
   const handleResolve = async (alertId: string) => {
-    await updateSOSStatusLocal(alertId, 'resolved');
-    addSyncLog(`SOS Alert ${alertId} resolved - raiser status restored to SAFE`, 'success', 'SOSAlert', alertId);
+    await updateSOSStatusLocal(alertId, 'resolved', user?.personnelId);
+    addSyncLog(`SOS Alert ${alertId} resolved by ${user?.name || 'Medic'} - raiser status restored to SAFE`, 'success', 'SOSAlert', alertId);
     await loadData();
+    apiResolveAlert(alertId).catch((e) => console.warn('Background Resolve sync:', e));
     syncAll().then(loadData);
   };
 
@@ -152,12 +159,13 @@ export default function SOSPage() {
   const resolvedAlerts = alerts.filter((a) => a.status === 'resolved');
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      {/* Visual Emergency Header & Big SOS Button */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-rose-950/40 via-polar-900 to-polar-950 border-2 border-rose-500/40 p-6 sm:p-10 shadow-2xl shadow-rose-950/50 text-center">
-        {/* Radar Ring Glows */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full border border-rose-500/20 pointer-events-none animate-ping opacity-25" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-rose-500/30 pointer-events-none" />
+    <AuthGuard>
+      <div className="space-y-8 max-w-4xl mx-auto">
+        {/* Visual Emergency Header & Big SOS Button */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-rose-950/40 via-polar-900 to-polar-950 border-2 border-rose-500/40 p-6 sm:p-10 shadow-2xl shadow-rose-950/50 text-center">
+          {/* Radar Ring Glows */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full border border-rose-500/20 pointer-events-none animate-ping opacity-25" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-rose-500/30 pointer-events-none" />
 
         <div className="relative z-10 space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-xs font-mono text-rose-300 uppercase tracking-widest font-bold">
@@ -395,20 +403,28 @@ export default function SOSPage() {
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2">
-                      {alert.status === 'active' && (
-                        <button
-                          onClick={() => handleAcknowledge(alert.alertId)}
-                          className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-xs font-mono font-bold transition-all shadow"
-                        >
-                          Acknowledge
-                        </button>
+                      {canTriage ? (
+                        <>
+                          {alert.status === 'active' && (
+                            <button
+                              onClick={() => handleAcknowledge(alert.alertId)}
+                              className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-xs font-mono font-bold transition-all shadow"
+                            >
+                              Acknowledge
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleResolve(alert.alertId)}
+                            className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition-all shadow"
+                          >
+                            Resolve Emergency
+                          </button>
+                        </>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700 text-xs font-mono">
+                          Medic / Cmdr Required to Resolve
+                        </span>
                       )}
-                      <button
-                        onClick={() => handleResolve(alert.alertId)}
-                        className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition-all shadow"
-                      >
-                        Resolve Emergency
-                      </button>
                     </div>
                   </div>
 
@@ -504,5 +520,6 @@ export default function SOSPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }

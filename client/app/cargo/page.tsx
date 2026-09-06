@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAllCargoLocal, deleteCargoLocal } from '@/lib/db';
+import { getAllCargoLocal, deleteCargoLocal, confirmCargoLocal } from '@/lib/db';
+import { apiConfirmCargo } from '@/lib/api';
 import { syncAll } from '@/lib/syncManager';
 import { CargoItem, CargoCategory, CargoStatus } from '@/lib/types';
 import {
@@ -17,8 +18,10 @@ import {
   Clock,
   MapPin,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function CargoListPage() {
   const [cargoList, setCargoList] = useState<CargoItem[]>([]);
@@ -26,7 +29,7 @@ export default function CargoListPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  const { syncStatus, addSyncLog } = useAppStore();
+  const { syncStatus, addSyncLog, user } = useAppStore();
 
   const loadCargo = async () => {
     try {
@@ -56,6 +59,21 @@ export default function CargoListPage() {
     syncAll();
   };
 
+  const handleConfirm = async (itemId: string, name: string) => {
+    if (!user) return;
+    try {
+      await confirmCargoLocal(itemId, user.personnelId);
+      addSyncLog(`Confirmed cargo '${name}' into warehouse inventory`, 'info', 'Cargo', itemId);
+      await loadCargo();
+      apiConfirmCargo(itemId).catch((e) => console.warn('Background API confirm queued:', e));
+      syncAll();
+    } catch (e) {
+      console.error('Failed to confirm cargo:', e);
+    }
+  };
+
+  const canConfirm = user?.role === 'commander' || user?.role === 'logistics';
+
   // Client-side filtering on local SQLite data
   const filteredItems = cargoList.filter((item) => {
     if (search && !item.name.toLowerCase().includes(search.toLowerCase()) && !item.itemId.toLowerCase().includes(search.toLowerCase())) {
@@ -71,41 +89,42 @@ export default function CargoListPage() {
   });
 
   const categories: CargoCategory[] = ['food', 'fuel', 'medical', 'equipment', 'scientific', 'other'];
-  const statuses: CargoStatus[] = ['warehouse', 'in-transit', 'delivered', 'consumed'];
+  const statuses: CargoStatus[] = ['requested', 'warehouse', 'in-transit', 'delivered', 'consumed'];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-polar-800">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Package className="w-6 h-6 text-polar-ice" />
-            Polar Logistics & Supplies
-          </h1>
-          <p className="text-xs font-mono text-polar-400 mt-1">
-            Local SQLite inventory • Instant reads & mutations • Auto-queued for satellite sync
-          </p>
-        </div>
+    <AuthGuard>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-polar-800">
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Package className="w-6 h-6 text-polar-ice" />
+              Polar Logistics & Supplies
+            </h1>
+            <p className="text-xs font-mono text-polar-400 mt-1">
+              Local SQLite inventory • Instant reads & mutations • Auto-queued for satellite sync
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              syncAll().then(loadCargo);
-            }}
-            className="p-2 rounded-lg bg-polar-800 hover:bg-polar-700 text-polar-400 hover:text-white border border-polar-700 transition-colors"
-            title="Refresh from Station Node"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin text-polar-ice' : ''}`} />
-          </button>
-          <Link
-            href="/cargo/new"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-polar-ice text-polar-950 font-mono font-bold text-xs shadow-lg shadow-polar-ice/20 hover:bg-sky-300 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            Log New Cargo
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                syncAll().then(loadCargo);
+              }}
+              className="p-2 rounded-lg bg-polar-800 hover:bg-polar-700 text-polar-400 hover:text-white border border-polar-700 transition-colors"
+              title="Refresh from Station Node"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin text-polar-ice' : ''}`} />
+            </button>
+            <Link
+              href="/cargo/new"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-polar-ice text-polar-950 font-mono font-bold text-xs shadow-lg shadow-polar-ice/20 hover:bg-sky-300 transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              Log New Cargo
+            </Link>
+          </div>
         </div>
-      </div>
 
       {/* Filter Bar */}
       <div className="polar-card p-4 space-y-3">
@@ -197,11 +216,21 @@ export default function CargoListPage() {
                         isLowStock ? 'bg-amber-500/5' : ''
                       }`}
                     >
-                      {/* Name & ID */}
+                      {/* Name & ID & Auth Tracking */}
                       <td className="py-3 px-4">
                         <div className="font-semibold text-white text-sm font-sans">{item.name}</div>
                         <div className="text-[11px] text-polar-400 truncate max-w-[180px]" title={item.itemId}>
                           {item.itemId}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1 font-mono flex items-center gap-1.5 flex-wrap">
+                          <span>Req: <span className="text-slate-200">{item.orderedBy || 'commander'}</span></span>
+                          {item.confirmedBy ? (
+                            <span className="text-emerald-400 flex items-center gap-0.5">
+                              • Conf: {item.confirmedBy}
+                            </span>
+                          ) : item.currentLocation.status === 'requested' ? (
+                            <span className="text-amber-400 font-semibold">• Awaiting Confirmation</span>
+                          ) : null}
                         </div>
                       </td>
 
@@ -241,7 +270,8 @@ export default function CargoListPage() {
                           <MapPin className="w-3 h-3 text-polar-teal" />
                           <span className="capitalize">{item.currentLocation.stationId}</span>
                         </div>
-                        <div className="text-[11px] text-polar-400 capitalize">
+                        <div className="text-[11px] text-polar-400 capitalize flex items-center gap-1 mt-0.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${item.currentLocation.status === 'requested' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                           {item.currentLocation.status}
                         </div>
                       </td>
@@ -260,7 +290,24 @@ export default function CargoListPage() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right space-x-2">
+                      <td className="py-3 px-4 text-right space-x-2 whitespace-nowrap">
+                        {item.currentLocation.status === 'requested' && (
+                          canConfirm ? (
+                            <button
+                              onClick={() => handleConfirm(item.itemId, item.name)}
+                              className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-semibold inline-flex items-center gap-1 transition-all"
+                              title="Commander / Logistics Confirm into Warehouse"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                              Confirm
+                            </button>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
+                              Pending Cmdr
+                            </span>
+                          )
+                        )}
+
                         <Link
                           href={`/cargo/${item.itemId}/edit`}
                           className="p-1.5 rounded bg-polar-800 hover:bg-polar-700 text-polar-ice inline-flex transition-colors"
@@ -285,5 +332,6 @@ export default function CargoListPage() {
         )}
       </div>
     </div>
+    </AuthGuard>
   );
 }

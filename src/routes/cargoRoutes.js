@@ -7,7 +7,9 @@ const {
   getCargoById,
   updateCargo,
   deleteCargo,
+  confirmCargo,
 } = require('../controllers/cargoController');
+const requireRole = require('../middleware/requireRole');
 
 router.route('/')
   .post(createCargo)
@@ -16,6 +18,8 @@ router.route('/')
 // Specific routes before parameterized :itemId
 router.route('/low-stock')
   .get(getLowStockCargo);
+
+router.put('/:itemId/confirm', requireRole(['commander', 'logistics']), confirmCargo);
 
 router.route('/:itemId')
   .get(getCargoById)

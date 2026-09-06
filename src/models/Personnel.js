@@ -13,11 +13,22 @@ const personnelSchema = new mongoose.Schema(
       required: [true, 'name is required'],
       trim: true,
     },
+    email: {
+      type: String,
+      required: [true, 'email is required'],
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    passwordHash: {
+      type: String,
+      required: [true, 'passwordHash is required'],
+    },
     role: {
       type: String,
       required: [true, 'role is required'],
       enum: {
-        values: ['scientist', 'engineer', 'medic', 'logistics', 'commander'],
+        values: ['scientist', 'engineer', 'medic', 'logistics', 'commander', 'hq_admin'],
         message: '{VALUE} is not a valid role',
       },
     },

@@ -87,6 +87,8 @@ export async function initDatabase(): Promise<void> {
           unit TEXT DEFAULT 'units',
           stationId TEXT DEFAULT 'station-alpha',
           status TEXT DEFAULT 'warehouse',
+          orderedBy TEXT DEFAULT 'commander',
+          confirmedBy TEXT,
           coordinates TEXT,
           transitHistory TEXT,
           expiryDate TEXT,
@@ -121,6 +123,7 @@ export async function initDatabase(): Promise<void> {
         CREATE TABLE IF NOT EXISTS sos_alerts (
           alertId TEXT PRIMARY KEY,
           raisedBy TEXT NOT NULL,
+          resolvedBy TEXT,
           stationId TEXT NOT NULL,
           location TEXT,
           severity TEXT DEFAULT 'critical',
@@ -136,6 +139,17 @@ export async function initDatabase(): Promise<void> {
           updatedAt TEXT
         );
       `);
+
+      // Safe column additions for existing SQLite databases
+      try {
+        await executeSQL('ALTER TABLE cargo ADD COLUMN orderedBy TEXT;');
+      } catch {}
+      try {
+        await executeSQL('ALTER TABLE cargo ADD COLUMN confirmedBy TEXT;');
+      } catch {}
+      try {
+        await executeSQL('ALTER TABLE sos_alerts ADD COLUMN resolvedBy TEXT;');
+      } catch {}
 
       isInitialized = true;
       console.log('❄️ [LOCAL SQLITE] PolarLink WA-SQLite Database Ready with Offline Tables');
@@ -250,6 +264,8 @@ export async function saveCargoLocal(
     category: cargo.category || 'other',
     quantity: Number(cargo.quantity || 0),
     unit: cargo.unit || 'units',
+    orderedBy: cargo.orderedBy || 'commander',
+    confirmedBy: cargo.confirmedBy || null,
     currentLocation: {
       stationId: cargo.currentLocation?.stationId || 'station-alpha',
       coordinates: cargo.currentLocation?.coordinates || { lat: -77.846, lng: 166.668 },
@@ -271,7 +287,7 @@ export async function saveCargoLocal(
     try {
       const sql = `
         INSERT OR REPLACE INTO cargo (
-          itemId, name, category, quantity, unit, stationId, status,
+          itemId, name, category, quantity, unit, stationId, status, orderedBy, confirmedBy,
           coordinates, transitHistory, expiryDate, criticalThreshold,
           _synced, _lastModified, _deleted, _pending_sync, _local_id, createdAt, updatedAt
         ) VALUES (
@@ -282,6 +298,8 @@ export async function saveCargoLocal(
           '${sanitize(fullCargo.unit)}',
           '${sanitize(fullCargo.currentLocation.stationId)}',
           '${sanitize(fullCargo.currentLocation.status)}',
+          '${sanitize(fullCargo.orderedBy || 'commander')}',
+          ${fullCargo.confirmedBy ? `'${sanitize(fullCargo.confirmedBy)}'` : 'NULL'},
           '${sanitize(JSON.stringify(fullCargo.currentLocation.coordinates))}',
           '${sanitize(JSON.stringify(fullCargo.transitHistory || []))}',
           ${fullCargo.expiryDate ? `'${sanitize(fullCargo.expiryDate)}'` : 'NULL'},
@@ -304,6 +322,17 @@ export async function saveCargoLocal(
   memoryStore.cargo.set(fullCargo.itemId, fullCargo);
   persistMemoryStore();
   return fullCargo;
+}
+
+export async function confirmCargoLocal(itemId: string, confirmedByPersonnelId: string): Promise<CargoItem | null> {
+  const existing = await getCargoByIdLocal(itemId);
+  if (!existing) return null;
+  existing.confirmedBy = confirmedByPersonnelId;
+  existing.currentLocation.status = 'warehouse';
+  existing._pending_sync = true;
+  existing._synced = false;
+  existing._lastModified = new Date().toISOString();
+  return await saveCargoLocal(existing, true);
 }
 
 export async function deleteCargoLocal(itemId: string): Promise<void> {
@@ -483,6 +512,7 @@ export async function saveSOSAlertLocal(
     location: alert.location || { lat: -77.846, lng: 166.668 },
     severity: alert.severity || 'critical',
     status: alert.status || 'active',
+    resolvedBy: alert.resolvedBy || null,
     matchedMedic: alert.matchedMedic || null,
     matchedInventory: alert.matchedInventory || [],
     _synced: alert._synced ?? false,
@@ -507,12 +537,13 @@ export async function saveSOSAlertLocal(
     try {
       const sql = `
         INSERT OR REPLACE INTO sos_alerts (
-          alertId, raisedBy, stationId, location, severity, status,
+          alertId, raisedBy, resolvedBy, stationId, location, severity, status,
           matchedMedic, matchedInventory,
           _synced, _lastModified, _deleted, _pending_sync, _local_id, createdAt, updatedAt
         ) VALUES (
           '${sanitize(fullAlert.alertId)}',
           '${sanitize(fullAlert.raisedBy)}',
+          ${fullAlert.resolvedBy ? `'${sanitize(fullAlert.resolvedBy)}'` : 'NULL'},
           '${sanitize(fullAlert.stationId)}',
           '${sanitize(JSON.stringify(fullAlert.location))}',
           '${sanitize(fullAlert.severity)}',
@@ -541,12 +572,16 @@ export async function saveSOSAlertLocal(
 
 export async function updateSOSStatusLocal(
   alertId: string,
-  status: 'acknowledged' | 'resolved'
+  status: 'acknowledged' | 'resolved',
+  resolvedBy?: string | null
 ): Promise<SOSAlertItem | null> {
   const alert = await getSOSAlertByIdLocal(alertId);
   if (!alert) return null;
 
   alert.status = status;
+  if (status === 'resolved' && resolvedBy) {
+    alert.resolvedBy = resolvedBy;
+  }
   alert._pending_sync = true;
   alert._synced = false;
   alert._lastModified = new Date().toISOString();
@@ -702,6 +737,8 @@ function formatCargoFromRow(row: any): CargoItem {
     category: row.category,
     quantity: Number(row.quantity),
     unit: row.unit || 'units',
+    orderedBy: row.orderedBy || 'commander',
+    confirmedBy: row.confirmedBy || null,
     currentLocation: {
       stationId: row.stationId || 'station-alpha',
       status: row.status || 'warehouse',
@@ -744,6 +781,7 @@ function formatSOSAlertFromRow(row: any): SOSAlertItem {
   return {
     alertId: row.alertId,
     raisedBy: row.raisedBy,
+    resolvedBy: row.resolvedBy || null,
     stationId: row.stationId,
     location: parseJSON(row.location, { lat: -77.846, lng: 166.668 }),
     severity: row.severity,

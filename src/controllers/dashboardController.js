@@ -68,6 +68,104 @@ const getDashboardStats = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc Get mainland Goa HQ overview aggregated across all stations
+ * @route GET /api/dashboard/hq-overview
+ * @access Private (hq_admin only)
+ */
+const getHQOverview = async (req, res, next) => {
+  try {
+    const [totalCargo, totalPersonnel, activeSOSCount] = await Promise.all([
+      Cargo.countDocuments({ _deleted: false }),
+      Personnel.countDocuments({ _deleted: false }),
+      SOSAlert.countDocuments({ status: 'active', _deleted: false }),
+    ]);
+
+    // Aggregate cargo by currentLocation.stationId
+    const cargoByStation = await Cargo.aggregate([
+      { $match: { _deleted: false } },
+      {
+        $group: {
+          _id: '$currentLocation.stationId',
+          pendingCount: {
+            $sum: { $cond: [{ $eq: ['$_synced', false] }, 1, 0] },
+          },
+          lastModified: { $max: '$_lastModified' },
+          updatedAt: { $max: '$updatedAt' },
+        },
+      },
+    ]);
+
+    // Aggregate personnel by currentLocation.stationId
+    const personnelByStation = await Personnel.aggregate([
+      { $match: { _deleted: false } },
+      {
+        $group: {
+          _id: '$currentLocation.stationId',
+          pendingCount: {
+            $sum: { $cond: [{ $eq: ['$_synced', false] }, 1, 0] },
+          },
+          lastModified: { $max: '$_lastModified' },
+          updatedAt: { $max: '$updatedAt' },
+        },
+      },
+    ]);
+
+    const stationMap = new Map();
+
+    const addOrUpdateStation = (stationId, pending, ts) => {
+      const id = stationId || 'station-alpha';
+      const existing = stationMap.get(id);
+      const timestamp = ts ? new Date(ts).toISOString() : new Date().toISOString();
+
+      if (!existing) {
+        stationMap.set(id, {
+          stationId: id,
+          lastSyncTimestamp: timestamp,
+          pendingSyncCount: pending || 0,
+        });
+      } else {
+        existing.pendingSyncCount += (pending || 0);
+        if (ts && new Date(ts) > new Date(existing.lastSyncTimestamp)) {
+          existing.lastSyncTimestamp = timestamp;
+        }
+      }
+    };
+
+    cargoByStation.forEach((item) => {
+      addOrUpdateStation(item._id, item.pendingCount, item.lastModified || item.updatedAt);
+    });
+
+    personnelByStation.forEach((item) => {
+      addOrUpdateStation(item._id, item.pendingCount, item.lastModified || item.updatedAt);
+    });
+
+    if (stationMap.size === 0) {
+      stationMap.set('station-alpha', {
+        stationId: 'station-alpha',
+        lastSyncTimestamp: new Date().toISOString(),
+        pendingSyncCount: 0,
+      });
+    }
+
+    const stations = Array.from(stationMap.values());
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalCargo,
+        totalPersonnel,
+        activeSOSCount,
+        stations,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getDashboardStats,
+  getHQOverview,
 };

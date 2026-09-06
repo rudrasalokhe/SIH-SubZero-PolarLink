@@ -1,11 +1,14 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const connectDB = require('./config/db');
 const Cargo = require('./models/Cargo');
 const Personnel = require('./models/Personnel');
 const SOSAlert = require('./models/SOSAlert');
 const SyncLog = require('./models/SyncLog');
+
+const defaultPasswordHash = bcrypt.hashSync('polar123', 10);
 
 const seedCargoData = [
   {
@@ -14,6 +17,8 @@ const seedCargoData = [
     category: 'food',
     quantity: 150,
     unit: 'packs',
+    orderedBy: 'pers-cmd-01',
+    confirmedBy: 'pers-log-01',
     currentLocation: {
       stationId: 'station-alpha',
       coordinates: { lat: -77.846, lng: 166.668 },
@@ -24,7 +29,7 @@ const seedCargoData = [
         fromStation: 'mcmurdo-base',
         toStation: 'station-alpha',
         timestamp: new Date(Date.now() - 14 * 86400000),
-        handledBy: 'pers-logistics-01',
+        handledBy: 'pers-log-01',
       },
     ],
     expiryDate: new Date('2028-12-31'),
@@ -39,6 +44,8 @@ const seedCargoData = [
     category: 'food',
     quantity: 8, // Low stock: 8 <= 15
     unit: 'boxes',
+    orderedBy: 'pers-cmd-01',
+    confirmedBy: 'pers-log-01',
     currentLocation: {
       stationId: 'station-alpha',
       coordinates: { lat: -77.846, lng: 166.668 },
@@ -57,96 +64,8 @@ const seedCargoData = [
     category: 'fuel',
     quantity: 45,
     unit: 'drums',
-    currentLocation: {
-      stationId: 'station-alpha',
-      coordinates: { lat: -77.846, lng: 166.668 },
-      status: 'warehouse',
-    },
-    transitHistory: [],
-    expiryDate: new Date('2030-01-01'),
-    criticalThreshold: 10,
-    _synced: false,
-    _lastModified: new Date(),
-    _deleted: false,
-  },
-  {
-    itemId: 'carg-7f2a-4890-8804',
-    name: 'Stove Generator Kerosene Canisters',
-    category: 'fuel',
-    quantity: 4, // Low stock: 4 <= 12
-    unit: 'canisters',
-    currentLocation: {
-      stationId: 'station-alpha',
-      coordinates: { lat: -77.846, lng: 166.668 },
-      status: 'warehouse',
-    },
-    transitHistory: [],
-    expiryDate: new Date('2029-05-15'),
-    criticalThreshold: 12,
-    _synced: false,
-    _lastModified: new Date(),
-    _deleted: false,
-  },
-  {
-    itemId: 'carg-7f2a-4890-8805',
-    name: 'Trauma & Hypothermia First-Aid Emergency Kit',
-    category: 'medical',
-    quantity: 24,
-    unit: 'kits',
-    currentLocation: {
-      stationId: 'station-alpha',
-      coordinates: { lat: -77.846, lng: 166.668 },
-      status: 'warehouse',
-    },
-    transitHistory: [],
-    expiryDate: new Date('2027-11-20'),
-    criticalThreshold: 5,
-    _synced: false,
-    _lastModified: new Date(),
-    _deleted: false,
-  },
-  {
-    itemId: 'carg-7f2a-4890-8806',
-    name: 'Portable Automated External Defibrillator (AED)',
-    category: 'medical',
-    quantity: 3,
-    unit: 'units',
-    currentLocation: {
-      stationId: 'station-alpha',
-      coordinates: { lat: -77.846, lng: 166.668 },
-      status: 'warehouse',
-    },
-    transitHistory: [],
-    expiryDate: new Date('2028-09-10'),
-    criticalThreshold: 2,
-    _synced: false,
-    _lastModified: new Date(),
-    _deleted: false,
-  },
-  {
-    itemId: 'carg-7f2a-4890-8807',
-    name: 'EpiPen Auto-Injectors (0.3mg Adult)',
-    category: 'medical',
-    quantity: 2, // Low stock: 2 <= 6
-    unit: 'packs',
-    currentLocation: {
-      stationId: 'station-alpha',
-      coordinates: { lat: -77.846, lng: 166.668 },
-      status: 'warehouse',
-    },
-    transitHistory: [],
-    expiryDate: new Date('2026-12-01'),
-    criticalThreshold: 6,
-    _synced: false,
-    _lastModified: new Date(),
-    _deleted: false,
-  },
-  {
-    itemId: 'carg-7f2a-4890-8808',
-    name: 'Heavy Arctic Weather All-Season Tents',
-    category: 'equipment',
-    quantity: 16,
-    unit: 'tents',
+    orderedBy: 'pers-log-01',
+    confirmedBy: 'pers-cmd-01',
     currentLocation: {
       stationId: 'station-alpha',
       coordinates: { lat: -77.846, lng: 166.668 },
@@ -154,17 +73,119 @@ const seedCargoData = [
     },
     transitHistory: [],
     expiryDate: null,
-    criticalThreshold: 4,
+    criticalThreshold: 10,
+    _synced: false,
+    _lastModified: new Date(),
+    _deleted: false,
+  },
+  {
+    itemId: 'carg-7f2a-4890-8804',
+    name: 'Generator Heating Kerosene',
+    category: 'fuel',
+    quantity: 4, // Low stock: 4 <= 8
+    unit: 'barrels',
+    orderedBy: 'pers-eng-01',
+    confirmedBy: 'pers-cmd-01',
+    currentLocation: {
+      stationId: 'station-alpha',
+      coordinates: { lat: -77.846, lng: 166.668 },
+      status: 'warehouse',
+    },
+    transitHistory: [],
+    expiryDate: null,
+    criticalThreshold: 8,
+    _synced: false,
+    _lastModified: new Date(),
+    _deleted: false,
+  },
+  {
+    itemId: 'carg-7f2a-4890-8805',
+    name: 'Epinephrine Auto-Injectors (0.3mg)',
+    category: 'medical',
+    quantity: 3, // Low stock: 3 <= 5
+    unit: 'injectors',
+    orderedBy: 'pers-medic-01',
+    confirmedBy: 'pers-cmd-01',
+    currentLocation: {
+      stationId: 'station-alpha',
+      coordinates: { lat: -77.846, lng: 166.668 },
+      status: 'warehouse',
+    },
+    transitHistory: [],
+    expiryDate: new Date('2026-11-15'),
+    criticalThreshold: 5,
+    _synced: false,
+    _lastModified: new Date(),
+    _deleted: false,
+  },
+  {
+    itemId: 'carg-7f2a-4890-8806',
+    name: 'Hypothermia Thermal Wrap Blankets',
+    category: 'medical',
+    quantity: 25,
+    unit: 'units',
+    orderedBy: 'pers-medic-01',
+    confirmedBy: 'pers-log-01',
+    currentLocation: {
+      stationId: 'station-alpha',
+      coordinates: { lat: -77.846, lng: 166.668 },
+      status: 'warehouse',
+    },
+    transitHistory: [],
+    expiryDate: new Date('2029-01-01'),
+    criticalThreshold: 8,
+    _synced: false,
+    _lastModified: new Date(),
+    _deleted: false,
+  },
+  {
+    itemId: 'carg-7f2a-4890-8807',
+    name: 'Sub-Zero Snowmobile Track Belts',
+    category: 'equipment',
+    quantity: 6,
+    unit: 'pairs',
+    orderedBy: 'pers-eng-01',
+    confirmedBy: 'pers-log-01',
+    currentLocation: {
+      stationId: 'station-alpha',
+      coordinates: { lat: -77.846, lng: 166.668 },
+      status: 'warehouse',
+    },
+    transitHistory: [],
+    expiryDate: null,
+    criticalThreshold: 2,
+    _synced: false,
+    _lastModified: new Date(),
+    _deleted: false,
+  },
+  {
+    itemId: 'carg-7f2a-4890-8808',
+    name: 'Ice Core Drilling Diamond Bit (150mm)',
+    category: 'scientific',
+    quantity: 2,
+    unit: 'bits',
+    orderedBy: 'pers-sci-01',
+    confirmedBy: 'pers-cmd-01',
+    currentLocation: {
+      stationId: 'station-alpha',
+      coordinates: { lat: -77.846, lng: 166.668 },
+      status: 'warehouse',
+    },
+    transitHistory: [],
+    expiryDate: null,
+    criticalThreshold: 1,
     _synced: false,
     _lastModified: new Date(),
     _deleted: false,
   },
   {
     itemId: 'carg-7f2a-4890-8809',
-    name: 'Deep Ice Core Drilling Diamond Bit Assembly',
+    name: 'Spectrometer Cryogenic Calibration Gas',
     category: 'scientific',
-    quantity: 7,
-    unit: 'units',
+    quantity: 8,
+    unit: 'canisters',
+    orderedBy: 'pers-sci-01',
+    confirmedBy: 'pers-log-01',
     currentLocation: {
       stationId: 'station-alpha',
       coordinates: { lat: -77.846, lng: 166.668 },
@@ -183,6 +204,8 @@ const seedCargoData = [
     category: 'equipment',
     quantity: 12,
     unit: 'units',
+    orderedBy: 'pers-cmd-01',
+    confirmedBy: 'pers-log-01',
     currentLocation: {
       stationId: 'station-alpha',
       coordinates: { lat: -77.846, lng: 166.668 },
@@ -200,7 +223,9 @@ const seedCargoData = [
 const seedPersonnelData = [
   {
     personnelId: 'pers-medic-01',
-    name: 'Dr. Erik Lindqvist',
+    name: 'Dr. Vikram Sharma',
+    email: 'sharma@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'medic',
     medicalClearance: {
       status: 'cleared',
@@ -227,9 +252,9 @@ const seedPersonnelData = [
       lastCheckIn: new Date(),
     },
     emergencyContact: {
-      name: 'Astrid Lindqvist',
+      name: 'Pooja Sharma',
       relation: 'Spouse',
-      phone: '+46-70-1234567',
+      phone: '+91-98200-12345',
     },
     sosStatus: 'safe',
     _synced: false,
@@ -239,6 +264,8 @@ const seedPersonnelData = [
   {
     personnelId: 'pers-medic-02',
     name: 'Dr. Sarah Vance',
+    email: 'vance@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'medic',
     medicalClearance: {
       status: 'restricted',
@@ -271,6 +298,8 @@ const seedPersonnelData = [
   {
     personnelId: 'pers-cmd-01',
     name: 'Commander Alex Mercer',
+    email: 'mercer@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'commander',
     medicalClearance: {
       status: 'cleared',
@@ -303,6 +332,8 @@ const seedPersonnelData = [
   {
     personnelId: 'pers-sci-01',
     name: 'Dr. Elena Rostova',
+    email: 'rostova@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'scientist',
     medicalClearance: {
       status: 'cleared',
@@ -335,6 +366,8 @@ const seedPersonnelData = [
   {
     personnelId: 'pers-eng-01',
     name: 'Marcus Brody',
+    email: 'brody@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'engineer',
     medicalClearance: {
       status: 'cleared',
@@ -366,7 +399,9 @@ const seedPersonnelData = [
   },
   {
     personnelId: 'pers-log-01',
-    name: 'Tenzing Norbu',
+    name: 'Priya Patel',
+    email: 'patel@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'logistics',
     medicalClearance: {
       status: 'cleared',
@@ -387,9 +422,9 @@ const seedPersonnelData = [
       lastCheckIn: new Date(),
     },
     emergencyContact: {
-      name: 'Pasang Norbu',
-      relation: 'Brother',
-      phone: '+977-1-4412345',
+      name: 'Rajesh Patel',
+      relation: 'Father',
+      phone: '+91-79-26561234',
     },
     sosStatus: 'safe',
     _synced: false,
@@ -399,6 +434,8 @@ const seedPersonnelData = [
   {
     personnelId: 'pers-sci-02',
     name: 'Chloe Bennett',
+    email: 'bennett@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'scientist',
     medicalClearance: {
       status: 'pending',
@@ -431,6 +468,8 @@ const seedPersonnelData = [
   {
     personnelId: 'pers-eng-02',
     name: 'Sven Larson',
+    email: 'larson@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
     role: 'engineer',
     medicalClearance: {
       status: 'expired',
@@ -440,10 +479,10 @@ const seedPersonnelData = [
     },
     trainingStatus: [
       {
-        trainingType: 'Snowcat Engine Overhaul',
-        completedDate: new Date('2024-11-15'),
-        expiryDate: new Date('2026-11-15'),
-        certified: true,
+        trainingType: 'HVAC & Station Thermal Insulation',
+        completedDate: new Date('2025-02-14'),
+        expiryDate: new Date('2026-02-14'),
+        certified: false,
       },
     ],
     currentLocation: {
@@ -454,6 +493,40 @@ const seedPersonnelData = [
       name: 'Greta Larson',
       relation: 'Mother',
       phone: '+47-22-869000',
+    },
+    sosStatus: 'safe',
+    _synced: false,
+    _lastModified: new Date(),
+    _deleted: false,
+  },
+  {
+    personnelId: 'pers-hq-admin-01',
+    name: 'Ananya Rao',
+    email: 'admin@polarlink.expedition',
+    passwordHash: defaultPasswordHash,
+    role: 'hq_admin',
+    medicalClearance: {
+      status: 'cleared',
+      lastCheckupDate: new Date('2026-08-01'),
+      conditions: [],
+      bloodGroup: 'O+',
+    },
+    trainingStatus: [
+      {
+        trainingType: 'Mainland Command & Expedition Oversight',
+        completedDate: new Date('2025-01-10'),
+        expiryDate: new Date('2028-01-10'),
+        certified: true,
+      },
+    ],
+    currentLocation: {
+      stationId: 'hq-mainland-goa',
+      lastCheckIn: new Date(),
+    },
+    emergencyContact: {
+      name: 'Kiran Rao',
+      relation: 'Spouse',
+      phone: '+91-832-2456789',
     },
     sosStatus: 'safe',
     _synced: false,
@@ -486,9 +559,9 @@ async function seedDatabase() {
     console.log('❄️  POLARLINK SEEDING COMPLETED SUCCESSFULLY!  ❄️');
     console.log(`📦  Cargo items seeded: ${insertedCargo.length}`);
     console.log(`👤  Personnel seeded:   ${insertedPersonnel.length}`);
-    console.log('    - Roles: 2 medics, 2 scientists, 2 engineers, 1 commander, 1 logistics');
-    console.log('    - Clearances: 5 cleared, 1 restricted, 1 pending, 1 expired');
-    console.log('    - Low stock items: 3 (Nutri-Bars, Kerosene, EpiPens)');
+    console.log('    - Roles: 2 medics, 2 scientists, 2 engineers, 1 commander, 1 logistics, 1 hq_admin');
+    console.log('    - Passwords: All set to "polar123"');
+    console.log('    - Admin: admin@polarlink.expedition (Ananya Rao)');
     console.log('========================================================');
 
     await mongoose.connection.close();

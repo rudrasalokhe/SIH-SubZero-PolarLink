@@ -5,6 +5,7 @@ import { getPendingRecords } from '@/lib/db';
 import { syncAll } from '@/lib/syncManager';
 import { CargoItem, PersonnelItem, SOSAlertItem } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
+import AuthGuard from '@/components/AuthGuard';
 import {
   RefreshCw,
   Wifi,
@@ -76,9 +77,9 @@ export default function SyncDebugPage() {
     pendingData.cargo.length + pendingData.personnel.length + pendingData.sosAlerts.length;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-polar-800">
+    <AuthGuard>
+      <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-polar-800">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <RefreshCw className="w-6 h-6 text-polar-ice" />
@@ -318,5 +319,6 @@ export default function SyncDebugPage() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }

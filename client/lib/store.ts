@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SyncLogItem } from './types';
+import { SyncLogItem, AuthUser } from './types';
 
 export type SyncStatus = 'synced' | 'pending' | 'syncing' | 'offline';
 
@@ -12,6 +12,11 @@ interface AppState {
   syncLogs: SyncLogItem[];
   installPromptEvent: any | null;
 
+  // Auth State
+  user: AuthUser | null;
+  token: string | null;
+  authInitialized: boolean;
+
   setOnline: (online: boolean) => void;
   toggleSimulateOffline: () => void;
   setSyncStatus: (status: SyncStatus) => void;
@@ -20,6 +25,12 @@ interface AppState {
   addSyncLog: (message: string, status?: 'success' | 'warn' | 'error' | 'info', collection?: string, documentId?: string) => void;
   setInstallPrompt: (event: any) => void;
   isEffectivelyOnline: () => boolean;
+
+  // Auth Actions
+  login: (token: string, user: AuthUser) => void;
+  logout: () => void;
+  setUser: (user: AuthUser | null) => void;
+  initAuth: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -30,6 +41,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastSyncTime: null,
   syncLogs: [],
   installPromptEvent: null,
+
+  user: null,
+  token: null,
+  authInitialized: false,
 
   setOnline: (online) => {
     set({ isOnline: online });
@@ -84,5 +99,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   isEffectivelyOnline: () => {
     const { isOnline, simulateOffline } = get();
     return isOnline && !simulateOffline;
+  },
+
+  login: (token: string, user: AuthUser) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('polarlink_token', token);
+      localStorage.setItem('polarlink_user', JSON.stringify(user));
+    }
+    set({ token, user, authInitialized: true });
+    get().addSyncLog(`Authenticated: ${user.name} [${user.role.toUpperCase()}]`, 'info');
+  },
+
+  logout: () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('polarlink_token');
+      localStorage.removeItem('polarlink_user');
+    }
+    set({ token: null, user: null, authInitialized: true });
+    get().addSyncLog('User logged out', 'info');
+  },
+
+  setUser: (user) => set({ user }),
+
+  initAuth: () => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('polarlink_token');
+      const userStr = localStorage.getItem('polarlink_user');
+      if (token && userStr) {
+        try {
+          const user = JSON.parse(userStr) as AuthUser;
+          set({ token, user, authInitialized: true });
+          return;
+        } catch {
+          localStorage.removeItem('polarlink_token');
+          localStorage.removeItem('polarlink_user');
+        }
+      }
+    }
+    set({ authInitialized: true });
   },
 }));

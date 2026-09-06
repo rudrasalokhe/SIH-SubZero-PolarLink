@@ -1,5 +1,5 @@
 export type CargoCategory = 'food' | 'fuel' | 'medical' | 'equipment' | 'scientific' | 'other';
-export type CargoStatus = 'warehouse' | 'in-transit' | 'delivered' | 'consumed';
+export type CargoStatus = 'requested' | 'warehouse' | 'in-transit' | 'delivered' | 'consumed';
 
 export interface CargoItem {
   itemId: string;
@@ -7,6 +7,8 @@ export interface CargoItem {
   category: CargoCategory;
   quantity: number;
   unit: string;
+  orderedBy: string;
+  confirmedBy?: string | null;
   currentLocation: {
     stationId: string;
     coordinates: {
@@ -32,13 +34,23 @@ export interface CargoItem {
   updatedAt?: string;
 }
 
-export type PersonnelRole = 'scientist' | 'engineer' | 'medic' | 'logistics' | 'commander';
+export type PersonnelRole = 'scientist' | 'engineer' | 'medic' | 'logistics' | 'commander' | 'hq_admin';
 export type MedicalStatus = 'cleared' | 'pending' | 'restricted' | 'expired';
 export type SOSStatus = 'safe' | 'emergency' | 'unresponsive';
+
+export interface AuthUser {
+  personnelId: string;
+  name: string;
+  email: string;
+  role: PersonnelRole;
+  stationId: string;
+  medicalStatus?: MedicalStatus;
+}
 
 export interface PersonnelItem {
   personnelId: string;
   name: string;
+  email?: string;
   role: PersonnelRole;
   medicalClearance: {
     status: MedicalStatus;
@@ -77,6 +89,7 @@ export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
 export interface SOSAlertItem {
   alertId: string;
   raisedBy: string;
+  resolvedBy?: string | null;
   stationId: string;
   location: {
     lat: number;
@@ -106,6 +119,7 @@ export interface DashboardStats {
     medic: number;
     logistics: number;
     commander: number;
+    hq_admin?: number;
   };
   timestamp: string;
 }
@@ -117,4 +131,30 @@ export interface SyncLogItem {
   status: 'success' | 'warn' | 'error' | 'info';
   collection?: string;
   documentId?: string;
+}
+
+export interface HQStationTelemetry {
+  stationId: string;
+  stationName: string;
+  totalPersonnel: number;
+  personnelByRole: Record<string, number>;
+  totalCargoItems: number;
+  lowStockCargoCount: number;
+  activeSOSCount: number;
+  criticalSOSCount: number;
+  pendingSyncCount: number;
+  lastSyncTime: string | null;
+  status: 'operational' | 'alert' | 'critical' | 'lagging';
+}
+
+export interface HQOverviewData {
+  generatedAt: string;
+  headquarters: string;
+  overallSummary: {
+    totalStations: number;
+    totalPersonnelAcrossStations: number;
+    totalActiveSOS: number;
+    totalPendingSyncLogs: number;
+  };
+  stations: HQStationTelemetry[];
 }

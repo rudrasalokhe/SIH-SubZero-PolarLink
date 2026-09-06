@@ -6,15 +6,16 @@ const {
   acknowledgeAlert,
   resolveAlert,
 } = require('../controllers/sosController');
+const requireRole = require('../middleware/requireRole');
 
 router.route('/')
   .post(raiseSOSAlert)
   .get(getActiveAlerts);
 
 router.route('/:alertId/acknowledge')
-  .put(acknowledgeAlert);
+  .put(requireRole(['medic', 'commander']), acknowledgeAlert);
 
 router.route('/:alertId/resolve')
-  .put(resolveAlert);
+  .put(requireRole(['medic', 'commander']), resolveAlert);
 
 module.exports = router;

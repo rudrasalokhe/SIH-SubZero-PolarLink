@@ -44,6 +44,12 @@ const sosAlertSchema = new mongoose.Schema(
       ref: 'Personnel',
       default: null,
     },
+    resolvedBy: {
+      type: String,
+      ref: 'Personnel',
+      default: null,
+      trim: true,
+    },
     matchedInventory: [
       {
         type: String,

@@ -14,6 +14,22 @@ const createCargo = async (req, res, next) => {
       cargoData.itemId = uuidv4();
     }
 
+    // Set orderedBy from authenticated user
+    if (req.user && req.user.personnelId) {
+      cargoData.orderedBy = req.user.personnelId;
+    }
+
+    // Default currentLocation status to 'requested'
+    if (!cargoData.currentLocation) {
+      cargoData.currentLocation = {
+        stationId: 'station-alpha',
+        coordinates: { lat: -77.846, lng: 166.668 },
+        status: 'requested',
+      };
+    } else if (!cargoData.currentLocation.status) {
+      cargoData.currentLocation.status = 'requested';
+    }
+
     cargoData._synced = false;
     cargoData._lastModified = new Date();
     cargoData._deleted = false;
@@ -184,6 +200,39 @@ const deleteCargo = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc Confirm cargo order into warehouse inventory
+ * @route PUT /api/cargo/:itemId/confirm
+ * @access Private (commander, logistics)
+ */
+const confirmCargo = async (req, res, next) => {
+  try {
+    const { itemId } = req.params;
+
+    const cargo = await Cargo.findOne({ itemId, _deleted: false });
+    if (!cargo) {
+      return res.status(404).json({
+        success: false,
+        error: `Cargo item with itemId '${itemId}' not found`,
+      });
+    }
+
+    cargo.confirmedBy = req.user.personnelId;
+    cargo.currentLocation.status = 'warehouse';
+    cargo._synced = false;
+    cargo._lastModified = new Date();
+
+    await cargo.save();
+
+    res.status(200).json({
+      success: true,
+      data: cargo,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createCargo,
   getAllCargo,
@@ -191,4 +240,5 @@ module.exports = {
   getCargoById,
   updateCargo,
   deleteCargo,
+  confirmCargo,
 };

@@ -9,7 +9,8 @@ const Cargo = require('../models/Cargo');
  */
 const raiseSOSAlert = async (req, res, next) => {
   try {
-    const { raisedBy, stationId: inputStationId, location, severity } = req.body;
+    const raisedBy = (req.user && req.user.personnelId) || req.body.raisedBy;
+    const { stationId: inputStationId, location, severity } = req.body;
 
     if (!raisedBy) {
       return res.status(400).json({
@@ -166,6 +167,7 @@ const resolveAlert = async (req, res, next) => {
       {
         $set: {
           status: 'resolved',
+          resolvedBy: req.user ? req.user.personnelId : null,
           _synced: false,
           _lastModified: new Date(),
         },

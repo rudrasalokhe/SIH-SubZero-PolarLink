@@ -25,6 +25,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
@@ -59,7 +60,8 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <AuthGuard>
+      <div className="space-y-6">
       {/* Top Banner & Quick Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-polar-800">
         <div>
@@ -321,5 +323,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }

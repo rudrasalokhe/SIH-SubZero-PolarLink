@@ -31,6 +31,18 @@ const cargoSchema = new mongoose.Schema(
       default: 'units',
       trim: true,
     },
+    orderedBy: {
+      type: String,
+      ref: 'Personnel',
+      required: [true, 'orderedBy (personnelId) is required'],
+      trim: true,
+    },
+    confirmedBy: {
+      type: String,
+      ref: 'Personnel',
+      default: null,
+      trim: true,
+    },
     currentLocation: {
       stationId: {
         type: String,
@@ -44,10 +56,10 @@ const cargoSchema = new mongoose.Schema(
       status: {
         type: String,
         enum: {
-          values: ['warehouse', 'in-transit', 'delivered', 'consumed'],
+          values: ['requested', 'warehouse', 'in-transit', 'delivered', 'consumed'],
           message: '{VALUE} is not a valid status',
         },
-        default: 'warehouse',
+        default: 'requested',
       },
     },
     transitHistory: [

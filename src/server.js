@@ -7,12 +7,14 @@ const errorHandler = require('./middleware/errorHandler');
 const { startWatchers, stopWatchers } = require('./services/changeStreamWatcher');
 
 // Route imports
+const authRoutes = require('./routes/authRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 const cargoRoutes = require('./routes/cargoRoutes');
 const personnelRoutes = require('./routes/personnelRoutes');
 const sosRoutes = require('./routes/sosRoutes');
 const syncRoutes = require('./routes/syncRoutes');
-const healthRoutes = require('./routes/healthRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const authenticate = require('./middleware/authenticate');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +35,7 @@ app.get('/', (req, res) => {
       status: 'OPERATIONAL',
       mode: 'Offline-First',
       endpoints: {
+        auth: '/api/auth',
         health: '/api/health',
         dashboard: '/api/dashboard/stats',
         cargo: '/api/cargo',
@@ -44,13 +47,16 @@ app.get('/', (req, res) => {
   });
 });
 
-// Mount API routes
-app.use('/api/cargo', cargoRoutes);
-app.use('/api/personnel', personnelRoutes);
-app.use('/api/sos', sosRoutes);
-app.use('/api/sync', syncRoutes);
+// Public API routes
 app.use('/api/health', healthRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/auth', authRoutes);
+
+// Protected API routes (require valid JWT token)
+app.use('/api/cargo', authenticate, cargoRoutes);
+app.use('/api/personnel', authenticate, personnelRoutes);
+app.use('/api/sos', authenticate, sosRoutes);
+app.use('/api/sync', authenticate, syncRoutes);
+app.use('/api/dashboard', authenticate, dashboardRoutes);
 
 // Catch 404 for undefined routes
 app.use((req, res, next) => {
