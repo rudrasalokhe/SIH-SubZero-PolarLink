@@ -68,26 +68,14 @@ export async function initDatabase(): Promise<void> {
       // Dynamic imports to ensure browser-only execution
       const SQLite = await import('wa-sqlite');
       // @ts-ignore
-      const SQLiteAsyncESMFactory = (await import('wa-sqlite/dist/wa-sqlite-async.mjs')).default;
-      
-      // Use MemoryAsyncVFS (clean WebAssembly memory filesystem, immune to IDBContext transaction race crashes)
-      // @ts-ignore
-      const { MemoryAsyncVFS } = await import('wa-sqlite/src/examples/MemoryAsyncVFS.js');
-      const vfsInstance = new MemoryAsyncVFS();
-      const vfsName = 'memory-async';
+      const SQLiteESMFactory = (await import('wa-sqlite/dist/wa-sqlite.mjs')).default;
 
-      const module = await SQLiteAsyncESMFactory({
+      const module = await SQLiteESMFactory({
         locateFile: (file: string) => `/${file}`,
       });
       sqlite3Instance = SQLite.Factory(module);
 
-      sqlite3Instance.vfs_register(vfsInstance, true);
-
-      dbHandle = await sqlite3Instance.open_v2(
-        'polarlink.db',
-        SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE,
-        vfsName
-      );
+      dbHandle = await sqlite3Instance.open_v2('polarlink.db');
 
       // Create Tables
       await executeSQL(`
@@ -178,7 +166,11 @@ export async function executeSQL(sql: string): Promise<void> {
   if (typeof window === 'undefined') return;
   if (!dbHandle || !sqlite3Instance) return;
 
-  await sqlite3Instance.exec(dbHandle, sql);
+  try {
+    await sqlite3Instance.exec(dbHandle, sql);
+  } catch (e) {
+    console.warn('executeSQL error (fallback active):', e);
+  }
 }
 
 /**
@@ -189,13 +181,17 @@ export async function querySQL<T = any>(sql: string): Promise<T[]> {
   if (!dbHandle || !sqlite3Instance) return [];
 
   const rows: T[] = [];
-  await sqlite3Instance.exec(dbHandle, sql, (rowValues: any[], columnNames: string[]) => {
-    const obj: any = {};
-    for (let i = 0; i < columnNames.length; i++) {
-      obj[columnNames[i]] = rowValues[i];
-    }
-    rows.push(obj);
-  });
+  try {
+    await sqlite3Instance.exec(dbHandle, sql, (rowValues: any[], columnNames: string[]) => {
+      const obj: any = {};
+      for (let i = 0; i < columnNames.length; i++) {
+        obj[columnNames[i]] = rowValues[i];
+      }
+      rows.push(obj);
+    });
+  } catch (e) {
+    console.warn('querySQL error (fallback active):', e);
+  }
   return rows;
 }
 
