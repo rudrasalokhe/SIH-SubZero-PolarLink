@@ -1,14 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { AlertTriangle, WifiOff, ToggleLeft, ToggleRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function OfflineBanner() {
+  const [mounted, setMounted] = useState(false);
   const { isOnline, simulateOffline, toggleSimulateOffline, pendingCount } = useAppStore();
 
-  if (isOnline && !simulateOffline) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || (isOnline && !simulateOffline)) return null;
 
   return (
     <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-200">

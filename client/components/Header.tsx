@@ -21,10 +21,12 @@ import { initDatabase } from '@/lib/db';
 
 export default function Header() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { installPromptEvent, setInstallPrompt } = useAppStore();
 
   useEffect(() => {
+    setMounted(true);
     // Initialize WA-SQLite and start background sync manager
     initDatabase().then(() => {
       const stopSync = startBackgroundSync();
@@ -126,7 +128,7 @@ export default function Header() {
 
           {/* Right Actions: Install Button + Sync Badge */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {installPromptEvent && (
+            {mounted && installPromptEvent && (
               <button
                 onClick={handleInstallClick}
                 className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded bg-polar-800 text-polar-ice border border-polar-ice/40 hover:bg-polar-700 transition-colors"
@@ -179,7 +181,7 @@ export default function Header() {
             );
           })}
 
-          {installPromptEvent && (
+          {mounted && installPromptEvent && (
             <button
               onClick={() => {
                 handleInstallClick();

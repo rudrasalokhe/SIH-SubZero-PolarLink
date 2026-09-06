@@ -1,12 +1,31 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
 import { RefreshCw, Wifi, WifiOff, CloudUpload, CheckCircle2 } from 'lucide-react';
 
 export default function SyncBadge() {
+  const [mounted, setMounted] = useState(false);
   const { syncStatus, pendingCount, isEffectivelyOnline } = useAppStore();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 px-2.5 py-1 text-xs font-mono font-medium rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+      >
+        <span className="relative flex h-2 w-2">
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+        </span>
+        <span className="truncate max-w-[130px] sm:max-w-none">Synced</span>
+      </div>
+    );
+  }
+
   const online = isEffectivelyOnline();
 
   let badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';

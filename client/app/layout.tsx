@@ -27,8 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-polar-950 text-slate-100 flex flex-col font-sans selection:bg-polar-ice/20 selection:text-polar-ice">
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body
+        className="min-h-screen bg-polar-950 text-slate-100 flex flex-col font-sans selection:bg-polar-ice/20 selection:text-polar-ice"
+        suppressHydrationWarning
+      >
         <OfflineBanner />
         <Header />
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

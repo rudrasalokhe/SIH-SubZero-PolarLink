@@ -27,6 +27,7 @@ import {
 import { useAppStore } from '@/lib/store';
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<SOSAlertItem[]>([]);
   const [lowStockItems, setLowStockItems] = useState<CargoItem[]>([]);
@@ -49,6 +50,7 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     // 1. Instant local read from SQLite
     loadLocalStats();
 
@@ -68,7 +70,7 @@ export default function DashboardPage() {
             </span>
           </h1>
           <p className="text-sm text-polar-400 font-mono mt-0.5">
-            Local SQLite Active • Last Synced: {lastSyncTime || 'Pending sync'}
+            Local SQLite Active • Last Synced: {mounted && lastSyncTime ? lastSyncTime : 'Pending sync'}
           </p>
         </div>
 

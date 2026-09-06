@@ -23,19 +23,12 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  isOnline: true,
   simulateOffline: false,
   syncStatus: 'synced',
   pendingCount: 0,
   lastSyncTime: null,
-  syncLogs: [
-    {
-      id: 'init-1',
-      timestamp: new Date().toLocaleTimeString(),
-      message: 'PolarLink Field Client initialized with local WA-SQLite',
-      status: 'info',
-    },
-  ],
+  syncLogs: [],
   installPromptEvent: null,
 
   setOnline: (online) => {

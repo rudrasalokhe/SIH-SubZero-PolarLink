@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 export default function SyncDebugPage() {
+  const [mounted, setMounted] = useState(false);
   const [pendingData, setPendingData] = useState<{
     cargo: CargoItem[];
     personnel: PersonnelItem[];
@@ -43,7 +44,7 @@ export default function SyncDebugPage() {
     isEffectivelyOnline,
   } = useAppStore();
 
-  const effectivelyOnline = isEffectivelyOnline();
+  const effectivelyOnline = mounted ? isEffectivelyOnline() : true;
 
   const loadPending = async () => {
     try {
@@ -57,6 +58,7 @@ export default function SyncDebugPage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     loadPending();
   }, [pendingCount]);
 
@@ -117,7 +119,7 @@ export default function SyncDebugPage() {
           </div>
           <div className="mt-4 pt-3 border-t border-polar-800 flex items-center justify-between">
             <span className="text-xs font-mono font-semibold">
-              {simulateOffline ? (
+              {mounted && simulateOffline ? (
                 <span className="text-amber-400 flex items-center gap-1">
                   <WifiOff className="w-3.5 h-3.5" /> AIRGAP ACTIVE
                 </span>
@@ -163,7 +165,7 @@ export default function SyncDebugPage() {
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-polar-800 text-[11px] font-mono text-polar-400">
-            Last Synced: <span className="text-slate-200">{lastSyncTime || 'Pending initial cycle'}</span>
+            Last Synced: <span className="text-slate-200">{mounted && lastSyncTime ? lastSyncTime : 'Pending initial cycle'}</span>
           </div>
         </div>
 
@@ -282,7 +284,7 @@ export default function SyncDebugPage() {
         </div>
 
         <div className="space-y-1.5 font-mono text-xs max-h-72 overflow-y-auto pr-1">
-          {syncLogs.length === 0 ? (
+          {!mounted || syncLogs.length === 0 ? (
             <div className="text-polar-600 text-center py-4">No events logged yet.</div>
           ) : (
             syncLogs.map((log) => {
