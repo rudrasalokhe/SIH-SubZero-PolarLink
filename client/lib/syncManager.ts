@@ -35,6 +35,12 @@ let isSyncing = false;
 export async function syncAll(): Promise<void> {
   const store = useAppStore.getState();
 
+  // If unauthenticated, do not perform network sync
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('polarlink_token');
+    if (!token) return;
+  }
+
   // If offline or offline simulation active, don't attempt network calls
   if (!store.isEffectivelyOnline()) {
     store.setSyncStatus('offline');

@@ -182,8 +182,10 @@ export async function executeSQL(sql: string): Promise<void> {
 
   try {
     await sqlite3Instance.exec(dbHandle, sql);
-  } catch (e) {
-    console.warn('executeSQL error (fallback active):', e);
+  } catch (e: any) {
+    if (!e?.message?.includes('duplicate column name')) {
+      console.warn('executeSQL error (fallback active):', e);
+    }
   }
 }
 
