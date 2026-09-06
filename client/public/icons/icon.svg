@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="polarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a101d"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="iceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#polarGrad)"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#334155" stroke-width="8" stroke-dasharray="16 16"/>
+  <!-- Compass Needle / Polar Star -->
+  <polygon points="256,76 296,256 256,220 216,256" fill="url(#iceGrad)"/>
+  <polygon points="256,436 296,256 256,292 216,256" fill="#64748b"/>
+  <polygon points="76,256 256,296 220,256 256,216" fill="#475569"/>
+  <polygon points="436,256 256,296 292,256 256,216" fill="#38bdf8"/>
+  <circle cx="256" cy="256" r="28" fill="#0f172a" stroke="#38bdf8" stroke-width="8"/>
+  <circle cx="256" cy="256" r="10" fill="#2dd4bf"/>
+</svg>
