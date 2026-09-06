@@ -28,6 +28,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {process.env.NODE_ENV === 'development' && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var r of regs) { r.unregister(); }
+                  });
+                }
+              `,
+            }}
+          />
+        )}
+      </head>
       <body
         className="min-h-screen bg-polar-950 text-slate-100 flex flex-col font-sans selection:bg-polar-ice/20 selection:text-polar-ice"
         suppressHydrationWarning
