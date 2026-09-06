@@ -1,6 +1,6 @@
 {
   "name": "polarlink-field-client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Offline-First Polar Expedition Field Client PWA",
   "private": true,
   "scripts": {
