@@ -19,8 +19,42 @@ const memoryStore = {
   sosAlerts: new Map<string, SOSAlertItem>(),
 };
 
+const persistMemoryStore = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('polarlink_cargo', JSON.stringify(Array.from(memoryStore.cargo.entries())));
+    localStorage.setItem('polarlink_personnel', JSON.stringify(Array.from(memoryStore.personnel.entries())));
+    localStorage.setItem('polarlink_sos', JSON.stringify(Array.from(memoryStore.sosAlerts.entries())));
+  } catch (e) {
+    console.warn('[STORAGE] Failed to persist to localStorage:', e);
+  }
+};
+
+const restoreMemoryStore = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const cargoData = localStorage.getItem('polarlink_cargo');
+    if (cargoData) {
+      const entries: [string, CargoItem][] = JSON.parse(cargoData);
+      entries.forEach(([k, v]) => memoryStore.cargo.set(k, v));
+    }
+    const personnelData = localStorage.getItem('polarlink_personnel');
+    if (personnelData) {
+      const entries: [string, PersonnelItem][] = JSON.parse(personnelData);
+      entries.forEach(([k, v]) => memoryStore.personnel.set(k, v));
+    }
+    const sosData = localStorage.getItem('polarlink_sos');
+    if (sosData) {
+      const entries: [string, SOSAlertItem][] = JSON.parse(sosData);
+      entries.forEach(([k, v]) => memoryStore.sosAlerts.set(k, v));
+    }
+  } catch (e) {
+    console.warn('[STORAGE] Failed to restore from localStorage:', e);
+  }
+};
+
 /**
- * Initialize WA-SQLite database with OPFS (or IDB fallback)
+ * Initialize WA-SQLite database with MemoryAsyncVFS and local persistent cache
  */
 export async function initDatabase(): Promise<void> {
   if (typeof window === 'undefined') return;
@@ -29,38 +63,30 @@ export async function initDatabase(): Promise<void> {
 
   const actualInit = async () => {
     try {
+      restoreMemoryStore();
+
       // Dynamic imports to ensure browser-only execution
       const SQLite = await import('wa-sqlite');
       // @ts-ignore
       const SQLiteAsyncESMFactory = (await import('wa-sqlite/dist/wa-sqlite-async.mjs')).default;
       
-      let vfsInstance = null;
-      let vfsName = 'polarlink-idb-vfs';
-
-      // Use IndexedDB Batch Atomic VFS (reliable across all browsers and workers)
-      try {
-        // @ts-ignore
-        const { IDBBatchAtomicVFS } = await import('wa-sqlite/src/examples/IDBBatchAtomicVFS.js');
-        vfsInstance = new IDBBatchAtomicVFS(vfsName);
-        console.log('[LOCAL SQLITE] Initialized IDBBatchAtomicVFS (IndexedDB persistence)');
-      } catch (idbErr) {
-        console.warn('[LOCAL SQLITE] IDB VFS unavailable, using default Memory VFS:', idbErr);
-        vfsName = '';
-      }
+      // Use MemoryAsyncVFS (clean WebAssembly memory filesystem, immune to IDBContext transaction race crashes)
+      // @ts-ignore
+      const { MemoryAsyncVFS } = await import('wa-sqlite/src/examples/MemoryAsyncVFS.js');
+      const vfsInstance = new MemoryAsyncVFS();
+      const vfsName = 'memory-async';
 
       const module = await SQLiteAsyncESMFactory({
         locateFile: (file: string) => `/${file}`,
       });
       sqlite3Instance = SQLite.Factory(module);
 
-      if (vfsInstance && vfsName) {
-        sqlite3Instance.vfs_register(vfsInstance, true);
-      }
+      sqlite3Instance.vfs_register(vfsInstance, true);
 
       dbHandle = await sqlite3Instance.open_v2(
         'polarlink.db',
         SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE,
-        vfsName || undefined
+        vfsName
       );
 
       // Create Tables
@@ -280,6 +306,7 @@ export async function saveCargoLocal(
   }
 
   memoryStore.cargo.set(fullCargo.itemId, fullCargo);
+  persistMemoryStore();
   return fullCargo;
 }
 
@@ -403,6 +430,7 @@ export async function savePersonnelLocal(
   }
 
   memoryStore.personnel.set(fullPersonnel.personnelId, fullPersonnel);
+  persistMemoryStore();
   return fullPersonnel;
 }
 
@@ -511,6 +539,7 @@ export async function saveSOSAlertLocal(
   }
 
   memoryStore.sosAlerts.set(fullAlert.alertId, fullAlert);
+  persistMemoryStore();
   return fullAlert;
 }
 
