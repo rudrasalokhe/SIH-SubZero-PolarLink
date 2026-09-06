@@ -153,10 +153,75 @@ const updatePersonnel = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc Update personnel GPS location
+ * @route PUT /api/personnel/:personnelId/location
+ * @access Private (own location only, unless commander/hq_admin)
+ */
+const updateLocation = async (req, res, next) => {
+  try {
+    const { personnelId } = req.params;
+    const { lat, lng } = req.body;
+
+    if (lat == null || lng == null) {
+      return res.status(400).json({
+        success: false,
+        error: 'lat and lng are required',
+      });
+    }
+
+    // Ownership check: user can only update their own location
+    // Commander and hq_admin can update anyone's (manual override / testing)
+    const callerRole = req.user?.role;
+    const callerId = req.user?.personnelId;
+    const isPrivileged = callerRole === 'commander' || callerRole === 'hq_admin';
+
+    if (!isPrivileged && callerId !== personnelId) {
+      return res.status(403).json({
+        success: false,
+        error: 'You can only update your own location',
+      });
+    }
+
+    const updated = await Personnel.findOneAndUpdate(
+      { personnelId, _deleted: false },
+      {
+        $set: {
+          'currentLocation.coordinates.lat': lat,
+          'currentLocation.coordinates.lng': lng,
+          'currentLocation.lastLocationUpdate': new Date(),
+          _synced: false,
+          _lastModified: new Date(),
+        },
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        error: `Personnel '${personnelId}' not found`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        personnelId: updated.personnelId,
+        coordinates: updated.currentLocation.coordinates,
+        lastLocationUpdate: updated.currentLocation.lastLocationUpdate,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createPersonnel,
   getAllPersonnel,
   getAvailableMedics,
   getPersonnelById,
   updatePersonnel,
+  updateLocation,
 };

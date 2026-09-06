@@ -67,6 +67,11 @@ export interface PersonnelItem {
   currentLocation: {
     stationId: string;
     lastCheckIn?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+    lastLocationUpdate?: string;
   };
   emergencyContact?: {
     name: string;
@@ -133,28 +138,16 @@ export interface SyncLogItem {
   documentId?: string;
 }
 
-export interface HQStationTelemetry {
+export interface HQStation {
   stationId: string;
-  stationName: string;
-  totalPersonnel: number;
-  personnelByRole: Record<string, number>;
-  totalCargoItems: number;
-  lowStockCargoCount: number;
-  activeSOSCount: number;
-  criticalSOSCount: number;
+  lastSyncTimestamp: string;
   pendingSyncCount: number;
-  lastSyncTime: string | null;
-  status: 'operational' | 'alert' | 'critical' | 'lagging';
 }
 
 export interface HQOverviewData {
-  generatedAt: string;
-  headquarters: string;
-  overallSummary: {
-    totalStations: number;
-    totalPersonnelAcrossStations: number;
-    totalActiveSOS: number;
-    totalPendingSyncLogs: number;
-  };
-  stations: HQStationTelemetry[];
+  totalCargo: number;
+  totalPersonnel: number;
+  activeSOSCount: number;
+  stations: HQStation[];
+  timestamp: string;
 }

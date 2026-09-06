@@ -71,6 +71,14 @@ const personnelSchema = new mongoose.Schema(
         type: Date,
         default: Date.now,
       },
+      coordinates: {
+        lat: { type: Number, default: null },
+        lng: { type: Number, default: null },
+      },
+      lastLocationUpdate: {
+        type: Date,
+        default: null,
+      },
     },
     emergencyContact: {
       name: { type: String, trim: true },

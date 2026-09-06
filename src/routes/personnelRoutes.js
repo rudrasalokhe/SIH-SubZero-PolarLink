@@ -6,6 +6,7 @@ const {
   getAvailableMedics,
   getPersonnelById,
   updatePersonnel,
+  updateLocation,
 } = require('../controllers/personnelController');
 
 router.route('/')
@@ -15,6 +16,9 @@ router.route('/')
 // Specific routes before parameterized :personnelId
 router.route('/available-medics')
   .get(getAvailableMedics);
+
+router.route('/:personnelId/location')
+  .put(updateLocation);
 
 router.route('/:personnelId')
   .get(getPersonnelById)

@@ -49,3 +49,40 @@ body {
   border-color: rgba(56, 189, 248, 0.4);
   box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.08);
 }
+
+/* Leaflet Dark Command Styles */
+@import 'leaflet/dist/leaflet.css';
+
+.leaflet-container {
+  background: #060a12 !important;
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #0b1220 !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #1e293b !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: inherit !important;
+}
+
+.leaflet-popup-tip {
+  background: #0b1220 !important;
+  border: 1px solid #1e293b !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  padding: 6px 8px !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #f87171 !important;
+}
+

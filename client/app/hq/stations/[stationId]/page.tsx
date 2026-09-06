@@ -80,13 +80,22 @@ export default function StationDrilldownPage() {
             </div>
           </div>
 
-          <button
-            onClick={loadStationData}
-            className="self-start sm:self-auto px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-2"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Station
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Link
+              href={`/hq/map?station=${stationId}`}
+              className="px-3 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs font-mono text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 flex items-center gap-2 transition-colors"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              View on Map
+            </Link>
+            <button
+              onClick={loadStationData}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-slate-300 hover:text-white flex items-center gap-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Station
+            </button>
+          </div>
         </div>
 
         {/* Quick Station Stats Bar */}

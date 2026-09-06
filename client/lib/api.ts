@@ -177,6 +177,16 @@ export async function apiGetHQOverview(): Promise<HQOverviewData> {
   return res.data.data;
 }
 
+export async function apiPromoteUser(personnelId: string, newRole: string): Promise<{ personnelId: string; name: string; email: string; oldRole: string; newRole: string }> {
+  const res = await apiClient.put(`/auth/promote/${personnelId}`, { role: newRole });
+  return res.data.data;
+}
+
+export async function apiUpdateLocation(personnelId: string, lat: number, lng: number): Promise<any> {
+  const res = await apiClient.put(`/personnel/${personnelId}/location`, { lat, lng });
+  return res.data.data;
+}
+
 export async function apiCheckHealth(): Promise<boolean> {
   try {
     const res = await apiClient.get('/health', { timeout: 2500 });

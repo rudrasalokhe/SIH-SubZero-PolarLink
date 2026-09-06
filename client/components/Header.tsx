@@ -16,11 +16,13 @@ import {
   LogOut,
   Building2,
   Shield,
+  MapPin,
 } from 'lucide-react';
 import SyncBadge from './SyncBadge';
 import { useAppStore } from '@/lib/store';
 import { startBackgroundSync } from '@/lib/syncManager';
 import { initDatabase } from '@/lib/db';
+import { useLocationTracking } from '@/lib/useLocationTracking';
 
 export default function Header() {
   const pathname = usePathname();
@@ -28,6 +30,9 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { installPromptEvent, setInstallPrompt, user, logout, initAuth } = useAppStore();
+
+  // Field location background reporting
+  useLocationTracking();
 
   useEffect(() => {
     setMounted(true);
@@ -78,6 +83,7 @@ export default function Header() {
   const navLinks = isHQAdmin
     ? [
         { href: '/hq', label: 'HQ Overview', icon: Building2 },
+        { href: '/hq/map', label: 'Live Map', icon: MapPin },
         { href: '/hq/sync-log', label: 'Global Sync Log', icon: RefreshCw },
         { href: '/dashboard', label: 'Field Terminal', icon: Compass },
       ]

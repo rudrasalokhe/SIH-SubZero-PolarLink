@@ -1,15 +1,24 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   getAllSOSAlertsLocal,
   saveSOSAlertLocal,
   updateSOSStatusLocal,
   getAllPersonnelLocal,
   getAllCargoLocal,
+  savePersonnelLocal,
+  saveCargoLocal,
 } from '@/lib/db';
 import { triggerPrioritySOSSync, syncAll } from '@/lib/syncManager';
-import { apiAcknowledgeAlert, apiResolveAlert } from '@/lib/api';
+import {
+  apiAcknowledgeAlert,
+  apiResolveAlert,
+  apiRaiseSOS,
+  apiGetActiveAlerts,
+  apiGetPersonnel,
+  apiGetCargo,
+} from '@/lib/api';
 import { SOSAlertItem, PersonnelItem, CargoItem, AlertSeverity } from '@/lib/types';
 import {
   AlertOctagon,
@@ -53,18 +62,73 @@ export default function SOSPage() {
 
   const canTriage = user?.role === 'medic' || user?.role === 'commander';
 
+  // Sync state when logged-in user becomes available
+  useEffect(() => {
+    if (user?.personnelId) {
+      setRaisedBy((prev) => prev || user.personnelId);
+      if (user.stationId) setStationId(user.stationId);
+    }
+  }, [user]);
+
+  // Ensure current logged-in user is always in the selectable personnel list
+  const availablePersonnel = useMemo(() => {
+    const list = [...personnelList];
+    if (user?.personnelId && !list.some((p) => p.personnelId === user.personnelId)) {
+      list.unshift({
+        personnelId: user.personnelId,
+        name: user.name || user.email || 'Current Operator',
+        role: user.role,
+        currentLocation: { stationId: user.stationId || 'station-alpha' },
+        medicalClearance: { status: 'cleared' },
+        sosStatus: 'safe',
+      } as PersonnelItem);
+    }
+    return list;
+  }, [personnelList, user]);
+
   const loadData = async () => {
     try {
-      const [allAlerts, allPersonnel, allCargo] = await Promise.all([
+      let [allAlerts, allPersonnel, allCargo] = await Promise.all([
         getAllSOSAlertsLocal(),
         getAllPersonnelLocal(),
         getAllCargoLocal(),
       ]);
+
+      // If local cache is empty and network is available, hydrate from server
+      if (isEffectivelyOnline() && (allPersonnel.length === 0 || allAlerts.length === 0)) {
+        try {
+          const [remoteAlerts, remotePersonnel, remoteCargo] = await Promise.all([
+            apiGetActiveAlerts(),
+            apiGetPersonnel(),
+            apiGetCargo(),
+          ]);
+          if (remoteAlerts) {
+            for (const a of remoteAlerts) await saveSOSAlertLocal(a, false);
+            allAlerts = remoteAlerts;
+          }
+          if (remotePersonnel && remotePersonnel.length > 0) {
+            for (const p of remotePersonnel) await savePersonnelLocal(p, false);
+            allPersonnel = remotePersonnel;
+          }
+          if (remoteCargo && remoteCargo.length > 0) {
+            for (const c of remoteCargo) await saveCargoLocal(c, false);
+            allCargo = remoteCargo;
+          }
+        } catch (netErr) {
+          console.warn('Network hydration error in SOS page:', netErr);
+        }
+      }
+
       setAlerts(allAlerts);
       setPersonnelList(allPersonnel);
       setCargoList(allCargo);
-      if (allPersonnel.length > 0 && !raisedBy) {
-        setRaisedBy(allPersonnel[0].personnelId);
+
+      if (!raisedBy) {
+        if (user?.personnelId) {
+          setRaisedBy(user.personnelId);
+        } else if (allPersonnel.length > 0) {
+          setRaisedBy(allPersonnel[0].personnelId);
+        }
       }
     } catch (e) {
       console.error('Error loading SOS data from local SQLite:', e);
@@ -96,28 +160,30 @@ export default function SOSPage() {
 
   const handleRaiseSOS = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!raisedBy) {
+    const finalRaiserId = raisedBy || user?.personnelId || (availablePersonnel[0]?.personnelId);
+    if (!finalRaiserId) {
       alert('Please select the crew member raising the alert');
       return;
     }
 
     setSubmitting(true);
     const alertId = `sos-${Math.random().toString(36).substring(2, 10)}`;
+    const finalStationId = stationId || user?.stationId || 'station-alpha';
 
-    // 1. Client-side local triage: pre-match available medic and inventory from local SQLite
-    const localMedic = personnelList.find(
+    // 1. Client-side local triage: pre-match available medic and inventory from local cache
+    const localMedic = availablePersonnel.find(
       (p) => p.role === 'medic' && p.medicalClearance?.status === 'cleared' && p.sosStatus === 'safe'
     );
     const localMedicalCargo = cargoList
       .filter((c) => c.category === 'medical' && c.currentLocation?.status !== 'consumed')
       .map((c) => c.itemId);
 
-    // 2. Instant local write to WA-SQLite
+    // 2. Prepare alert record
     const newAlert: Partial<SOSAlertItem> = {
       alertId,
       _local_id: alertId,
-      raisedBy,
-      stationId,
+      raisedBy: finalRaiserId,
+      stationId: finalStationId,
       location: { lat, lng },
       severity,
       status: 'active',
@@ -128,14 +194,37 @@ export default function SOSPage() {
       createdAt: new Date().toISOString(),
     };
 
-    await saveSOSAlertLocal(newAlert, true);
-    addSyncLog(`EMERGENCY SOS ${alertId} raised by ${raisedBy} (saved in WA-SQLite)`, 'warn', 'SOSAlert', alertId);
+    // 3. Instant direct dispatch to backend if online
+    if (online) {
+      try {
+        const remoteAlert = await apiRaiseSOS({
+          alertId,
+          raisedBy: finalRaiserId,
+          stationId: finalStationId,
+          location: { lat, lng },
+          severity,
+        });
+        if (remoteAlert) {
+          newAlert.matchedMedic = remoteAlert.matchedMedic;
+          newAlert.matchedInventory = remoteAlert.matchedInventory;
+          newAlert.status = remoteAlert.status;
+          newAlert._synced = true;
+          newAlert._pending_sync = false;
+        }
+      } catch (err: any) {
+        console.warn('Direct SOS API push queued for background sync:', err?.response?.data || err.message);
+      }
+    }
+
+    // 4. Save to local SQLite
+    await saveSOSAlertLocal(newAlert, !newAlert._synced);
+    addSyncLog(`EMERGENCY SOS ${alertId} broadcasted by ${finalRaiserId}`, 'warn', 'SOSAlert', alertId);
 
     setIsFormOpen(false);
     await loadData();
     setSubmitting(false);
 
-    // 3. Priority push to Station Master Node if connection allows
+    // 5. Trigger background sync
     triggerPrioritySOSSync().then(loadData);
   };
 
@@ -183,7 +272,14 @@ export default function SOSPage() {
           {/* GIANT RED PULSING SOS BUTTON */}
           <div className="pt-4 pb-2">
             <button
-              onClick={() => setIsFormOpen(true)}
+              onClick={() => {
+                if (!raisedBy && user?.personnelId) {
+                  setRaisedBy(user.personnelId);
+                } else if (!raisedBy && availablePersonnel.length > 0) {
+                  setRaisedBy(availablePersonnel[0].personnelId);
+                }
+                setIsFormOpen(true);
+              }}
               className="group relative inline-flex items-center justify-center w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-br from-rose-500 to-rose-700 text-white font-extrabold text-2xl sm:text-3xl tracking-wider shadow-2xl shadow-rose-600/50 border-4 border-rose-300/40 transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-rose-500/80 animate-pulse-urgent"
             >
               <div className="flex flex-col items-center gap-1.5 pointer-events-none">
@@ -234,16 +330,28 @@ export default function SOSPage() {
                 </label>
                 <select
                   required
-                  value={raisedBy}
-                  onChange={(e) => setRaisedBy(e.target.value)}
+                  value={raisedBy || user?.personnelId || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRaisedBy(val);
+                    const selected = availablePersonnel.find((p) => p.personnelId === val);
+                    if (selected?.currentLocation?.stationId) {
+                      setStationId(selected.currentLocation.stationId);
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 bg-polar-950 border border-polar-700 rounded-lg text-sm font-sans text-white focus:outline-none focus:border-rose-500"
                 >
-                  <option value="">Select Crew Member...</option>
-                  {personnelList.map((p) => (
-                    <option key={p.personnelId} value={p.personnelId}>
-                      {p.name} ({p.role.toUpperCase()} - {p.personnelId})
+                  {availablePersonnel.length === 0 ? (
+                    <option value={user?.personnelId || ''}>
+                      {user?.name || 'Current Operator'} ({user?.role || 'Personnel'})
                     </option>
-                  ))}
+                  ) : (
+                    availablePersonnel.map((p) => (
+                      <option key={p.personnelId} value={p.personnelId}>
+                        {p.name} ({p.role.toUpperCase()} - {p.personnelId})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
