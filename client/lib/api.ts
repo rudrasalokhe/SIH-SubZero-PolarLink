@@ -38,10 +38,17 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Auth Endpoints
 export async function apiLogin(credentials: { email: string; password: string }): Promise<{ token: string; user: AuthUser }> {
   const res = await apiClient.post('/auth/login', credentials);
-  return res.data.data;
+  const data = res.data?.data || res.data || {};
+  const user: AuthUser = data.user || {
+    personnelId: data.personnelId || 'pers-unknown',
+    name: data.name || data.email || 'Personnel',
+    email: data.email || credentials.email,
+    role: data.role || 'scientist',
+    stationId: data.stationId || 'station-alpha',
+  };
+  return { token: data.token, user };
 }
 
 export async function apiRegister(userData: {
@@ -52,7 +59,15 @@ export async function apiRegister(userData: {
   stationId: string;
 }): Promise<{ token: string; user: AuthUser }> {
   const res = await apiClient.post('/auth/register', userData);
-  return res.data.data;
+  const data = res.data?.data || res.data || {};
+  const user: AuthUser = data.user || {
+    personnelId: data.personnelId || 'pers-unknown',
+    name: data.name || userData.name,
+    email: data.email || userData.email,
+    role: data.role || userData.role,
+    stationId: data.stationId || userData.stationId || 'station-alpha',
+  };
+  return { token: data.token, user };
 }
 
 export async function apiGetMe(): Promise<AuthUser> {

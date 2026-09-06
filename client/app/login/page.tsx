@@ -74,7 +74,7 @@ export default function LoginPage() {
       const { token, user } = await apiLogin({ email, password });
       login(token, user);
 
-      if (user.role === 'hq_admin') {
+      if (user?.role === 'hq_admin') {
         router.push('/hq');
       } else {
         router.push('/dashboard');

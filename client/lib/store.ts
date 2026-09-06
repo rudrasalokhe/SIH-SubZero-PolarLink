@@ -104,10 +104,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   login: (token: string, user: AuthUser) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('polarlink_token', token);
-      localStorage.setItem('polarlink_user', JSON.stringify(user));
+      if (user) {
+        localStorage.setItem('polarlink_user', JSON.stringify(user));
+      }
     }
     set({ token, user, authInitialized: true });
-    get().addSyncLog(`Authenticated: ${user.name} [${user.role.toUpperCase()}]`, 'info');
+    const userName = user?.name || user?.email || 'Field Operator';
+    const roleTag = user?.role ? ` [${user.role.toUpperCase()}]` : '';
+    get().addSyncLog(`Authenticated: ${userName}${roleTag}`, 'info');
   },
 
   logout: () => {

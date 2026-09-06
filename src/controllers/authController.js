@@ -60,14 +60,20 @@ const register = async (req, res, next) => {
 
     const token = generateToken(newPersonnel);
 
+    const userPayload = {
+      personnelId: newPersonnel.personnelId,
+      name: newPersonnel.name,
+      email: newPersonnel.email,
+      role: newPersonnel.role,
+      stationId: newPersonnel.stationId || 'station-alpha',
+    };
+
     res.status(201).json({
       success: true,
       data: {
         token,
-        personnelId: newPersonnel.personnelId,
-        name: newPersonnel.name,
-        email: newPersonnel.email,
-        role: newPersonnel.role,
+        ...userPayload,
+        user: userPayload,
       },
     });
   } catch (err) {
@@ -133,14 +139,20 @@ const login = async (req, res, next) => {
 
     const token = generateToken(user);
 
+    const userPayload = {
+      personnelId: user.personnelId,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      stationId: user.stationId || 'station-alpha',
+    };
+
     res.status(200).json({
       success: true,
       data: {
         token,
-        personnelId: user.personnelId,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        ...userPayload,
+        user: userPayload,
       },
     });
   } catch (err) {
