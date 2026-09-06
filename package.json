@@ -1,0 +1,34 @@
+{
+  "name": "polarlink-station-master",
+  "version": "1.0.0",
+  "description": "Offline-first polar expedition logistics backend - Station Master Node",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/seed.js",
+    "test": "node --test tests/**/*.test.js"
+  },
+  "keywords": [
+    "polarlink",
+    "offline-first",
+    "logistics",
+    "express",
+    "mongodb",
+    "change-streams"
+  ],
+  "author": "PolarLink Team",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.0",
+    "morgan": "^1.10.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^9.2.0",
+    "supertest": "^7.0.0"
+  }
+}
