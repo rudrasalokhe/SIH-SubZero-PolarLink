@@ -27,7 +27,7 @@ export async function initDatabase(): Promise<void> {
   if (isInitialized) return;
   if (initPromise) return initPromise;
 
-  initPromise = (async () => {
+  const actualInit = async () => {
     try {
       // Dynamic imports to ensure browser-only execution
       const SQLite = await import('wa-sqlite');
@@ -35,44 +35,32 @@ export async function initDatabase(): Promise<void> {
       const SQLiteAsyncESMFactory = (await import('wa-sqlite/dist/wa-sqlite-async.mjs')).default;
       
       let vfsInstance = null;
-      let vfsName = 'polarlink-vfs';
+      let vfsName = 'polarlink-idb-vfs';
 
-      // 1. Try Origin Private File System (OPFS) first
-      if (typeof navigator !== 'undefined' && navigator.storage && 'getDirectory' in navigator.storage) {
-        try {
-          // @ts-ignore
-          const { OriginPrivateFileSystemVFS } = await import('wa-sqlite/src/examples/OriginPrivateFileSystemVFS.js');
-          vfsInstance = new OriginPrivateFileSystemVFS(vfsName);
-          console.log('[LOCAL SQLITE] Initialized OPFS (Origin Private File System) VFS');
-        } catch (opfsErr) {
-          console.warn('[LOCAL SQLITE] OPFS direct access unavailable, falling back to IDB VFS:', opfsErr);
-        }
+      // Use IndexedDB Batch Atomic VFS (reliable across all browsers and workers)
+      try {
+        // @ts-ignore
+        const { IDBBatchAtomicVFS } = await import('wa-sqlite/src/examples/IDBBatchAtomicVFS.js');
+        vfsInstance = new IDBBatchAtomicVFS(vfsName);
+        console.log('[LOCAL SQLITE] Initialized IDBBatchAtomicVFS (IndexedDB persistence)');
+      } catch (idbErr) {
+        console.warn('[LOCAL SQLITE] IDB VFS unavailable, using default Memory VFS:', idbErr);
+        vfsName = '';
       }
 
-      // 2. Fallback to IndexedDB Batch Atomic VFS if OPFS fails
-      if (!vfsInstance) {
-        try {
-          // @ts-ignore
-          const { IDBBatchAtomicVFS } = await import('wa-sqlite/src/examples/IDBBatchAtomicVFS.js');
-          vfsName = 'polarlink-idb-vfs';
-          vfsInstance = new IDBBatchAtomicVFS(vfsName);
-          console.log('[LOCAL SQLITE] Initialized IDBBatchAtomicVFS (IndexedDB persistence)');
-        } catch (idbErr) {
-          console.warn('[LOCAL SQLITE] IDB VFS unavailable, using default Memory VFS:', idbErr);
-        }
-      }
-
-      const module = await SQLiteAsyncESMFactory();
+      const module = await SQLiteAsyncESMFactory({
+        locateFile: (file: string) => `/${file}`,
+      });
       sqlite3Instance = SQLite.Factory(module);
 
-      if (vfsInstance) {
+      if (vfsInstance && vfsName) {
         sqlite3Instance.vfs_register(vfsInstance, true);
       }
 
       dbHandle = await sqlite3Instance.open_v2(
         'polarlink.db',
         SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE,
-        vfsName
+        vfsName || undefined
       );
 
       // Create Tables
@@ -141,8 +129,19 @@ export async function initDatabase(): Promise<void> {
       console.warn('[LOCAL SQLITE] WebAssembly SQLite initialization fallback to memory store:', err?.message || err);
       isInitialized = true;
     }
-  })();
+  };
 
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      if (!isInitialized) {
+        console.warn('[LOCAL SQLITE] Init timeout reached - fallback memory store active');
+        isInitialized = true;
+      }
+      resolve();
+    }, 2500);
+  });
+
+  initPromise = Promise.race([actualInit(), timeoutPromise]);
   return initPromise;
 }
 

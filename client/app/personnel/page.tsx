@@ -40,6 +40,7 @@ export default function PersonnelListPage() {
 
   useEffect(() => {
     loadPersonnel();
+    syncAll().then(loadPersonnel);
   }, []);
 
   const filteredItems = personnelList.filter((p) => {

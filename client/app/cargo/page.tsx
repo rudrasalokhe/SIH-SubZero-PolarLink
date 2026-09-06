@@ -41,6 +41,7 @@ export default function CargoListPage() {
 
   useEffect(() => {
     loadCargo();
+    syncAll().then(loadCargo);
   }, []);
 
   const handleDelete = async (itemId: string, name: string) => {
